@@ -1,0 +1,221 @@
+
+#include <IRremote.h> 
+
+//// PIN buzzer - mesafe sensörü
+#define echoPin 11 
+#define trigPin 7
+#define buzzerPin 8
+int maximumRange = 10;
+int minimumRange = 0;
+
+/////ışık sensörü LED
+#define led1 12
+#define led2 3
+////motor ve kumanda 
+const int IR_RECEIVE_PIN = 2;
+const int SolMotor1 = 9;
+const int SolMotor2 = 6;
+ 
+const int SagMotor1 = 5;
+const int SagMotor2 = 10;
+ const int Hiz = 100; // 0-255 arası hız değeri
+ 
+
+void setup() {
+
+  ///// Işık sensörü LED
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+
+  //// Ultrasonik sensör ve buzzer
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+
+  Serial.begin(9600);
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK); 
+
+  //// Motor pinleri
+ 
+  pinMode(SolMotor1, OUTPUT);
+  pinMode(SolMotor2, OUTPUT);
+  pinMode(SagMotor1, OUTPUT);
+  pinMode(SagMotor2, OUTPUT);
+  dur();  
+
+
+}
+
+void loop() {
+
+///// Işık sensörü LED
+  int isik = analogRead(A0);
+  //Serial.print("Işık değeri: ");
+  //Serial.println(isik);
+  delay(50);
+
+  if (isik > 550) {
+    digitalWrite(led1, LOW);
+    digitalWrite(led2, LOW);  // Ortam çok aydınlık   LED kapalı
+  } else if (isik < 500) {
+    digitalWrite(led1, HIGH);
+    digitalWrite(led2, HIGH); // Ortam karanlık   LED açık
+  }
+
+
+  ///// ULTRASONİK MESAFE VE BUZZER
+  int olcum = mesafe(maximumRange, minimumRange);
+  if (olcum > 0) {
+    melodi(olcum * 10);  // Yaklaştıkça ses artar
+  }
+
+
+////motor ve kumanda
+  if (IrReceiver.decode()) {
+    uint32_t kod = IrReceiver.decodedIRData.decodedRawData;
+    Serial.print("Kod: ");
+    Serial.println(kod, HEX);
+
+    //// Örnek buton kodlarıyla yön tayini (kumandana göre güncelleyebilirsin)
+    //// ileri çalışıyor
+    if (kod == 0xE718FF00) // İleri
+    { 
+      duzgit();
+       ////sol_motor("ILERI", Hiz);
+       ////sag_motor("ILERI", Hiz);
+    } 
+
+    if (kod == 0xF708FF00) { // Sol 
+      soladon();  
+      //// sol_motor("GERI", Hiz);  çalıştı
+      ////sag_motor("ILERI", Hiz); çalıştı
+    }
+
+   if (kod == 0xA55AFF00) { // Sağ
+      sagadon();
+       ////sol_motor("ILERI", Hiz); çalıştı
+      ////sag_motor("GERI", Hiz); çalışmadı
+    } 
+
+  if (kod == 0xAD52FF00) { // Geri
+      gerigit();
+        ////sol_motor("GERI", Hiz); çalıştı
+        ////sag_motor("GERI", Hiz); çalıştı
+   } 
+
+  if (kod == 0xE31CFF00) { // Dur
+      dur();
+      /////analogWrite(SagMotor1, 0);
+     /////analogWrite(SagMotor2, 0);
+    }
+    IrReceiver.resume();  // Yeni sinyal için bekle
+  }
+
+}
+
+// MESAFE ÖLÇÜMÜ
+int mesafe(int maxrange, int minrange) {
+  long duration, distance;
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration / 58.2;
+  delay(50);
+
+  if (distance >= maxrange || distance <= minrange)
+    return 0;
+  return distance;
+}
+
+// BUZZER MELODİ
+int melodi(int dly) {
+  tone(buzzerPin, 440);
+  delay(dly);
+  noTone(buzzerPin);
+  delay(dly);
+}
+
+
+// Motor kontrol fonksiyonları
+void sol_motor(String yon) 
+{
+  if (yon == "ILERI")
+  {
+    analogWrite(SolMotor1, Hiz);
+    analogWrite(SolMotor2, 0);
+    //digitalWrite(SolMotor1, HIGH);
+    //digitalWrite(SolMotor2, LOW);
+
+  }
+ else if (yon == "GERI") 
+ {
+    analogWrite(SolMotor1, 0);
+    analogWrite(SolMotor2, Hiz);
+    //digitalWrite(SolMotor1, LOW);
+    //digitalWrite(SolMotor2, HIGH);
+  }
+  
+}
+
+void sag_motor(String yon) 
+{
+  if (yon == "ILERI") 
+ {
+  
+    analogWrite(SagMotor1, 0);
+    analogWrite(SagMotor2, Hiz);
+
+    //digitalWrite(SagMotor1, LOW);
+    //digitalWrite(SagMotor2, HIGH);
+   
+ } 
+ else if (yon == "GERI")
+ {
+    analogWrite(SagMotor1, Hiz);
+    analogWrite(SagMotor2, 0);
+    //digitalWrite(SagMotor1, HIGH);
+    //digitalWrite(SagMotor2, LOW);
+
+  }
+  
+}
+
+void duzgit()
+ {
+  sol_motor("ILERI");
+  sag_motor("ILERI");
+ }
+
+void gerigit() 
+ {
+  sol_motor("GERI");
+  sag_motor("GERI");
+ }
+
+void soladon() 
+ {
+  sol_motor("GERI");
+  sag_motor("ILERI");
+ }
+
+void sagadon() 
+ {
+  sol_motor("ILERI");
+  sag_motor("GERI");
+ }
+
+void dur() 
+ {
+  analogWrite(SolMotor1, 0);
+  analogWrite(SolMotor2, 0);
+  analogWrite(SagMotor1, 0);
+  analogWrite(SagMotor2, 0);
+ }
+
+
